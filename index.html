@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Merge Game</title>
+    <style>
+        body { font-family: sans-serif; }
+        .grid { display: flex; gap: 10px; margin-bottom: 20px; }
+        .cell {
+            width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;
+            background: #eee; font-size: 1.5em; cursor: pointer; border-radius: 8px;
+            user-select: none;
+        }
+        .cell.selected { background: #aaf; }
+        #merged { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Merge Game</h1>
+    <p>Try merging the numbers below!</p>
+    <div class="grid" id="grid"></div>
+    <div id="merged"></div>
+    <script>
+        let numbers = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
+
+        // Add button to get more numbers
+        const moreBtn = document.createElement('button');
+        moreBtn.textContent = 'Get More Numbers';
+        moreBtn.onclick = () => {
+            // Add 3 random numbers (2 or 4)
+            for (let i = 0; i < 3; i++) {
+            numbers.push(Math.random() < 0.5 ? 2 : 4);
+            }
+            render();
+        };
+        document.addEventListener('DOMContentLoaded', () => {
+            document.body.insertBefore(moreBtn, document.getElementById('grid'));
+        // Add "Merge All" button
+        const mergeAllBtn = document.createElement('button');
+        mergeAllBtn.textContent = 'Merge All';
+        mergeAllBtn.onclick = () => {
+            let merged = false;
+            // Try to merge all adjacent equal numbers
+            for (let i = 0; i < numbers.length - 1; ) {
+            if (numbers[i] === numbers[i + 1]) {
+                numbers[i] *= 2;
+                mergedNumbers.push(numbers[i]);
+                numbers.splice(i + 1, 1);
+                merged = true;
+                // Don't increment i, check again in case of chain merges
+            } else {
+                i++;
+            }
+            }
+            if (merged) render();
+        };
+        document.body.insertBefore(mergeAllBtn, moreBtn.nextSibling);
+
+        });
+        let selected = null;
+        let mergedNumbers = [];
+
+        function render() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+            numbers.forEach((num, idx) => {
+                const cell = document.createElement('div');
+                cell.className = 'cell' + (selected === idx ? ' selected' : '');
+                cell.textContent = num;
+                cell.onclick = () => selectCell(idx);
+                grid.appendChild(cell);
+            });
+            document.getElementById('merged').textContent =
+                'Merged numbers: ' + mergedNumbers.join(', ');
+        }
+
+        function selectCell(idx) {
+            if (selected === null) {
+                selected = idx;
+            } else if (selected !== idx && numbers[selected] === numbers[idx]) {
+                // Merge
+                numbers[selected] *= 2;
+                mergedNumbers.push(numbers[selected]);
+                numbers.splice(idx, 1);
+                if (idx < selected) selected--;
+                selected = null;
+            } else {
+                selected = idx;
+            }
+            render();
+        }
+
+        render();
+    </script>
+</body>
+</html>
