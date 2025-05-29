@@ -176,6 +176,7 @@
         let mergedNumbers = [];
         let unlockedNumbers = new Set([2]);
         let hasWon = false;
+        let isScattered = false;
 
         function showOverlay(message, duration = 1500) {
             const overlay = document.getElementById('overlay');
@@ -202,6 +203,11 @@
                 skipBtn.onclick = () => {
                     extensionCount++;
                     clearTimeout(timeoutId);
+                    if (extensionCount >= 7) {
+                        overlay.style.display = 'none';
+                        makeNumbersGoEverywhere();
+                        return;
+                    }
                     timeoutId = setTimeout(() => {
                         overlay.style.display = 'none';
                     }, duration * (2.5 + extensionCount * 2));
@@ -212,6 +218,62 @@
                 }, duration * 2.5);
             }
             overlay.style.display = 'flex';
+        }
+
+        function makeNumbersGoEverywhere() {
+            isScattered = true;
+            const grid = document.getElementById('grid');
+            grid.style.position = 'fixed';
+            grid.style.left = '0';
+            grid.style.top = '0';
+            grid.style.width = '100vw';
+            grid.style.height = '100vh';
+            grid.style.pointerEvents = 'none';
+            Array.from(grid.children).forEach(cell => {
+                cell.style.position = 'absolute';
+                cell.style.transition = 'none'; // We'll animate with JS
+                cell.style.pointerEvents = 'auto';
+            });
+            let orbitTimeout;
+            // Precompute orbit parameters for each cell
+            const cells = Array.from(grid.children);
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            const cx = w / 2;
+            const cy = h / 2;
+            const minRadius = Math.min(w, h) * 0.22;
+            const maxRadius = Math.min(w, h) * 0.38;
+            // Assign each cell a unique angle and radius
+            const orbits = cells.map((cell, i) => {
+                const angle = (2 * Math.PI * i) / cells.length;
+                const radius = minRadius + (maxRadius - minRadius) * (0.5 + 0.5 * Math.sin(i));
+                const speed = 0.5 + Math.random() * 0.7; // radians/sec
+                const floatAmp = 18 + Math.random() * 18;
+                const floatSpeed = 0.7 + Math.random() * 0.7;
+                return { angle, radius, speed, floatAmp, floatSpeed };
+            });
+            function orbit(time) {
+                const t = time / 1000;
+                cells.forEach((cell, i) => {
+                    const o = orbits[i];
+                    // Animate angle
+                    const theta = o.angle + t * o.speed;
+                    // Animate floating (vertical sine wave)
+                    const floatY = Math.sin(t * o.floatSpeed + i) * o.floatAmp;
+                    // Calculate position, clamp so cell stays fully visible
+                    const cellW = cell.offsetWidth;
+                    const cellH = cell.offsetHeight;
+                    const x = cx + Math.cos(theta) * o.radius - cellW / 2;
+                    const y = cy + Math.sin(theta) * o.radius + floatY - cellH / 2;
+                    // Clamp to visible area
+                    const clampedX = Math.max(0, Math.min(x, w - cellW));
+                    const clampedY = Math.max(0, Math.min(y, h - cellH));
+                    cell.style.transform = `translate(${clampedX}px, ${clampedY}px)`;
+                    cell.style.zIndex = 10;
+                });
+                orbitTimeout = requestAnimationFrame(orbit);
+            }
+            orbit();
         }
 
         function checkUnlock(num) {
@@ -231,19 +293,33 @@
         function render() {
             const grid = document.getElementById('grid');
             grid.innerHTML = '';
-            numbers.forEach((num, idx) => {
-                const cell = document.createElement('div');
-                cell.className = 'cell' + (selected === idx ? ' selected' : '');
-                cell.textContent = num;
-                cell.setAttribute('data-num', num);
-                cell.onclick = () => selectCell(idx);
-                grid.appendChild(cell);
-                checkUnlock(num);
-            });
+            grid.style.display = 'flex';
+            grid.style.flexDirection = 'column';
+            grid.style.gap = '10px';
+            const perRow = 22;
+            for (let rowStart = 0; rowStart < numbers.length; rowStart += perRow) {
+                const rowDiv = document.createElement('div');
+                rowDiv.style.display = 'flex';
+                rowDiv.style.gap = '10px';
+                for (let i = rowStart; i < Math.min(rowStart + perRow, numbers.length); i++) {
+                    const num = numbers[i];
+                    const cell = document.createElement('div');
+                    cell.className = 'cell' + (selected === i ? ' selected' : '');
+                    cell.textContent = num;
+                    cell.setAttribute('data-num', num);
+                    cell.onclick = () => {
+                        if (!isScattered) selectCell(i);
+                    };
+                    rowDiv.appendChild(cell);
+                    checkUnlock(num);
+                }
+                grid.appendChild(rowDiv);
+            }
             checkWin();
         }
 
         function selectCell(idx) {
+            if (isScattered) return;
             if (selected === null) {
                 selected = idx;
             } else if (selected !== idx && numbers[selected] === numbers[idx]) {
@@ -253,6 +329,10 @@
                 numbers.splice(idx, 1);
                 if (idx < selected) selected--;
                 selected = null;
+            } else if (selected !== idx) {
+                // Show overlay for invalid merge
+                showOverlay("Nope that's not right dummy");
+                selected = idx;
             } else {
                 selected = idx;
             }
@@ -263,9 +343,11 @@
         const moreBtn = document.createElement('button');
         moreBtn.textContent = 'Get More Numbers';
         moreBtn.onclick = () => {
-            // Add 3 numbers (only 2)
-            for (let i = 0; i < 3; i++) {
-                numbers.push(2);
+            // Add 10 of the highest unlocked number
+            let unlockedArr = Array.from(unlockedNumbers).map(Number).sort((a,b)=>a-b);
+            let highestUnlocked = unlockedArr[unlockedArr.length-1] || 2;
+            for (let i = 0; i < 10; i++) {
+                numbers.push(highestUnlocked);
             }
             showOverlay('Wow you got more nubmers');
             render();
@@ -276,7 +358,7 @@
         const mergeAllBtn = document.createElement('button');
         mergeAllBtn.textContent = 'Merge All';
         mergeAllBtn.onclick = () => {
-            showOverlay('Cheater');
+            showOverlay('Cheater cheater pumpkin eater');
             // Reset progress
             numbers = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
             mergedNumbers = [];
