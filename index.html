@@ -4,61 +4,203 @@
     <meta charset="UTF-8">
     <title>Merge Game</title>
     <style>
-        body { font-family: sans-serif; }
+        body {
+            font-family: sans-serif;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #232946 0%, #3e92cc 40%, #a2d6f9 100%);
+            background-attachment: fixed;
+            position: relative;
+            overflow-x: hidden;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: 0;
+            pointer-events: none;
+            background: 
+                radial-gradient(circle at 80% 20%, rgba(255,255,255,0.10) 0, transparent 60%),
+                radial-gradient(circle at 20% 80%, rgba(255,255,255,0.10) 0, transparent 60%),
+                radial-gradient(circle at 50% 50%, rgba(255,255,255,0.07) 0, transparent 70%);
+            filter: blur(2px);
+        }
+        h1, p {
+            color: #fff;
+            text-shadow: 0 2px 8px rgba(30,30,60,0.18);
+        }
         .grid { display: flex; gap: 10px; margin-bottom: 20px; }
         .cell {
-            width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;
-            background: #eee; font-size: 1.5em; cursor: pointer; border-radius: 8px;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #eee;
+            font-size: 2em;
+            font-family: 'Orbitron', 'Segoe UI', 'Arial', sans-serif;
+            font-weight: 900;
+            letter-spacing: 1px;
+            color: #222;
+            cursor: pointer;
+            border-radius: 16px;
             user-select: none;
+            box-shadow: 0 4px 16px rgba(79,140,255,0.18), 0 1.5px 4px rgba(0,0,0,0.10);
+            transition: box-shadow 0.2s, transform 0.2s, background 0.2s, color 0.2s;
+            position: relative;
+            overflow: hidden;
         }
-        .cell.selected { background: #aaf; }
+        .cell::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 16px;
+            background: radial-gradient(circle at 70% 30%, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.05) 80%, transparent 100%);
+            pointer-events: none;
+            z-index: 1;
+        }
+        .cell.selected {
+            background: linear-gradient(90deg, #aaf, #e0e7ff);
+            color: #2a2a7f;
+            box-shadow: 0 0 24px 8px #aaf, 0 4px 16px rgba(79,140,255,0.18);
+        }
+        .cell[data-num="2"] {
+            color: #388e3c;
+            background: linear-gradient(135deg, #eaffea 60%, #c8f7c5 100%);
+            border-color: #7fff7f;
+        }
+        .cell[data-num="4"] {
+            color: #b8860b;
+            background: linear-gradient(135deg, #fffbe0 60%, #ffe9a7 100%);
+            border-color: #ffe97f;
+        }
+        .cell[data-num="8"] {
+            color: #c62828;
+            background: linear-gradient(135deg, #ffeaea 60%, #ffc5c5 100%);
+            border-color: #ff7f7f;
+        }
+        .cell[data-num="16"] {
+            color: #283593;
+            background: linear-gradient(135deg, #eaeaff 60%, #c5c5ff 100%);
+            border-color: #7f7fff;
+        }
+        .cell[data-num="32"] {
+            color: #0277bd;
+            background: linear-gradient(135deg, #e0f7ff 60%, #b3e0ff 100%);
+            border-color: #7fd8ff;
+        }
+        .cell[data-num="64"] {
+            color: #8e24aa;
+            background: linear-gradient(135deg, #f0e0ff 60%, #dab3ff 100%);
+            border-color: #c27fff;
+        }
+        .cell[data-num="128"] {
+            color: #e65100;
+            background: linear-gradient(135deg, #fff0e0 60%, #ffd6b3 100%);
+            border-color: #ffb97f;
+        }
+        .cell[data-num="256"] {
+            color: #00897b;
+            background: linear-gradient(135deg, #e0fff7 60%, #b3fff0 100%);
+            border-color: #7ffff0;
+        }
+        .cell[data-num="512"] {
+            color: #6a1b9a;
+            background: linear-gradient(135deg, #f7e0ff 60%, #e0b3ff 100%);
+            border-color: #d67fff;
+        }
+        .cell[data-num="1024"] {
+            color: #ad1457;
+            background: linear-gradient(135deg, #ffe0f7 60%, #ffb3e0 100%);
+            border-color: #ff7fd8;
+        }
+        .cell[data-num="2048"] {
+            color: #00695c;
+            background: linear-gradient(135deg, #e0fff0 60%, #b3ffd6 100%);
+            border-color: #7fffb9;
+        }
+        .cell[data-num] {
+            /* fallback for any number not explicitly styled above */
+            color: #222;
+        }
         #merged { margin-top: 20px; }
+        button {
+            background: linear-gradient(90deg, #4f8cff, #6ee7ff);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 28px;
+            font-size: 1.1em;
+            font-weight: bold;
+            box-shadow: 0 2px 8px rgba(79,140,255,0.15);
+            cursor: pointer;
+            transition: box-shadow 0.2s, transform 0.2s, background 0.2s;
+            outline: none;
+            margin-right: 10px;
+        }
+        button:hover, button:focus {
+            box-shadow: 0 0 16px 4px #6ee7ff, 0 2px 8px rgba(79,140,255,0.25);
+            background: linear-gradient(90deg, #6ee7ff, #4f8cff);
+            transform: scale(1.05);
+        }
+        #overlay {
+            z-index: 1000;
+        }
+        .cell[data-num]:hover, .cell[data-num]:focus {
+            outline: 3.5px solid #fff;
+            outline-offset: -4px;
+            box-shadow: 0 0 24px 8px #fff, 0 0 32px 12px var(--cell-glow, #6ee7ff), 0 2px 8px rgba(79,140,255,0.25);
+            z-index: 2;
+        }
+        .cell[data-num="2"]:hover, .cell[data-num="2"]:focus { --cell-glow: #7fff7f; }
+        .cell[data-num="4"]:hover, .cell[data-num="4"]:focus { --cell-glow: #ffe97f; }
+        .cell[data-num="8"]:hover, .cell[data-num="8"]:focus { --cell-glow: #ff7f7f; }
+        .cell[data-num="16"]:hover, .cell[data-num="16"]:focus { --cell-glow: #7f7fff; }
+        .cell[data-num="32"]:hover, .cell[data-num="32"]:focus { --cell-glow: #7fd8ff; }
+        .cell[data-num="64"]:hover, .cell[data-num="64"]:focus { --cell-glow: #c27fff; }
+        .cell[data-num="128"]:hover, .cell[data-num="128"]:focus { --cell-glow: #ffb97f; }
+        .cell[data-num="256"]:hover, .cell[data-num="256"]:focus { --cell-glow: #7ffff0; }
+        .cell[data-num="512"]:hover, .cell[data-num="512"]:focus { --cell-glow: #d67fff; }
+        .cell[data-num="1024"]:hover, .cell[data-num="1024"]:focus { --cell-glow: #ff7fd8; }
+        .cell[data-num="2048"]:hover, .cell[data-num="2048"]:focus { --cell-glow: #7fffb9; }
     </style>
 </head>
 <body>
     <h1>Merge Game</h1>
     <p>Try merging the numbers below!</p>
     <div class="grid" id="grid"></div>
-    <div id="merged"></div>
+    <div id="overlay" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);color:#fff;z-index:1000;align-items:center;justify-content:center;font-size:2.5em;font-weight:bold;flex-direction:column;"></div>
     <script>
         let numbers = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
-
-        // Add button to get more numbers
-        const moreBtn = document.createElement('button');
-        moreBtn.textContent = 'Get More Numbers';
-        moreBtn.onclick = () => {
-            // Add 3 random numbers (2 or 4)
-            for (let i = 0; i < 3; i++) {
-            numbers.push(Math.random() < 0.5 ? 2 : 4);
-            }
-            render();
-        };
-        document.addEventListener('DOMContentLoaded', () => {
-            document.body.insertBefore(moreBtn, document.getElementById('grid'));
-        // Add "Merge All" button
-        const mergeAllBtn = document.createElement('button');
-        mergeAllBtn.textContent = 'Merge All';
-        mergeAllBtn.onclick = () => {
-            let merged = false;
-            // Try to merge all adjacent equal numbers
-            for (let i = 0; i < numbers.length - 1; ) {
-            if (numbers[i] === numbers[i + 1]) {
-                numbers[i] *= 2;
-                mergedNumbers.push(numbers[i]);
-                numbers.splice(i + 1, 1);
-                merged = true;
-                // Don't increment i, check again in case of chain merges
-            } else {
-                i++;
-            }
-            }
-            if (merged) render();
-        };
-        document.body.insertBefore(mergeAllBtn, moreBtn.nextSibling);
-
-        });
         let selected = null;
         let mergedNumbers = [];
+        let unlockedNumbers = new Set([2]);
+        let hasWon = false;
+
+        function showOverlay(message, duration = 1500) {
+            const overlay = document.getElementById('overlay');
+            overlay.textContent = message;
+            overlay.style.display = 'flex';
+            if (duration > 0) {
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                }, duration);
+            }
+        }
+
+        function checkUnlock(num) {
+            if (!unlockedNumbers.has(num)) {
+                unlockedNumbers.add(num);
+                showOverlay('New nubmer unlocked: ' + num);
+            }
+        }
+
+        function checkWin() {
+            if (!hasWon && numbers.includes(2048)) {
+                hasWon = true;
+                showOverlay('You win!', 0);
+            }
+        }
 
         function render() {
             const grid = document.getElementById('grid');
@@ -67,11 +209,12 @@
                 const cell = document.createElement('div');
                 cell.className = 'cell' + (selected === idx ? ' selected' : '');
                 cell.textContent = num;
+                cell.setAttribute('data-num', num);
                 cell.onclick = () => selectCell(idx);
                 grid.appendChild(cell);
+                checkUnlock(num);
             });
-            document.getElementById('merged').textContent =
-                'Merged numbers: ' + mergedNumbers.join(', ');
+            checkWin();
         }
 
         function selectCell(idx) {
@@ -90,6 +233,34 @@
             render();
         }
 
+        // Add button to get more numbers
+        const moreBtn = document.createElement('button');
+        moreBtn.textContent = 'Get More Numbers';
+        moreBtn.onclick = () => {
+            // Add 3 numbers (only 2)
+            for (let i = 0; i < 3; i++) {
+                numbers.push(2);
+            }
+            showOverlay('Wow you got more nubmers');
+            render();
+        };
+        document.addEventListener('DOMContentLoaded', () => {
+            document.body.insertBefore(moreBtn, document.getElementById('grid'));
+        // Add "Merge All" button
+        const mergeAllBtn = document.createElement('button');
+        mergeAllBtn.textContent = 'Merge All';
+        mergeAllBtn.onclick = () => {
+            showOverlay('Cheater');
+            // Reset progress
+            numbers = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
+            mergedNumbers = [];
+            unlockedNumbers = new Set([2]);
+            hasWon = false;
+            render();
+        };
+        document.body.insertBefore(mergeAllBtn, moreBtn.nextSibling);
+
+        });
         render();
     </script>
 </body>
