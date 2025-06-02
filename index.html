@@ -8,22 +8,13 @@
             font-family: sans-serif;
             min-height: 100vh;
             margin: 0;
-            background: linear-gradient(135deg, #232946 0%, #3e92cc 40%, #a2d6f9 100%);
+            background: #7d7401 !important;
             background-attachment: fixed;
             position: relative;
             overflow-x: hidden;
         }
         body::before {
-            content: '';
-            position: fixed;
-            top: 0; left: 0; width: 100vw; height: 100vh;
-            z-index: 0;
-            pointer-events: none;
-            background: 
-                radial-gradient(circle at 80% 20%, rgba(255,255,255,0.10) 0, transparent 60%),
-                radial-gradient(circle at 20% 80%, rgba(255,255,255,0.10) 0, transparent 60%),
-                radial-gradient(circle at 50% 50%, rgba(255,255,255,0.07) 0, transparent 70%);
-            filter: blur(2px);
+            content: none !important;
         }
         h1, p {
             color: #fff;
@@ -168,8 +159,15 @@
 <body>
     <h1>Merge Game</h1>
     <p>Click the numbers to merge or click the merge all button</p>
+    <div style="margin-bottom: 18px;">
+        <button id="more-btn">Get More Numbers</button>
+        <button id="merge-all-btn">Merge All</button>
+        <button id="powerup-btn" style="display:none;">Power Up</button>
+    </div>
     <div class="grid" id="grid"></div>
     <div id="overlay" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7);color:#fff;z-index:1000;align-items:center;justify-content:center;font-size:2.5em;font-weight:bold;flex-direction:column;"></div>
+    <div id="cooldown-timer" style="display:none;position:fixed;left:0;right:0;bottom:24px;margin:0 auto;width:fit-content;padding:12px 32px;background:rgba(30,40,60,0.85);color:#fff;font-size:1.5em;font-weight:bold;border-radius:16px;box-shadow:0 2px 16px 0 rgba(79,140,255,0.18);text-align:center;z-index:2000;"></div>
+    <audio id="merge-audio" src="Dylan screaming.mp3" preload="auto"></audio>
     <script>
         let numbers = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
         let selected = null;
@@ -177,6 +175,10 @@
         let unlockedNumbers = new Set([2]);
         let hasWon = false;
         let isScattered = false;
+        let mergeCooldown = false;
+        let pendingMerge = null;
+        let mergeAudio = null;
+        let mergeCount = 0; // Track successful merges
 
         function showOverlay(message, duration = 1500) {
             const overlay = document.getElementById('overlay');
@@ -290,6 +292,10 @@
             }
         }
 
+        function isPotato(val) {
+            return val === '🥔';
+        }
+
         function render() {
             const grid = document.getElementById('grid');
             grid.innerHTML = '';
@@ -305,71 +311,241 @@
                     const num = numbers[i];
                     const cell = document.createElement('div');
                     cell.className = 'cell' + (selected === i ? ' selected' : '');
-                    cell.textContent = num;
-                    cell.setAttribute('data-num', num);
+                    cell.textContent = isPotato(num) ? '🥔' : num;
+                    cell.setAttribute('data-num', isPotato(num) ? 'potato' : num);
                     cell.onclick = () => {
-                        if (!isScattered) selectCell(i);
+                        if (!isScattered && !isPotato(num)) selectCell(i);
                     };
                     rowDiv.appendChild(cell);
-                    checkUnlock(num);
+                    if (!isPotato(num)) checkUnlock(num);
                 }
                 grid.appendChild(rowDiv);
             }
             checkWin();
         }
 
-        function selectCell(idx) {
-            if (isScattered) return;
-            if (selected === null) {
-                selected = idx;
-            } else if (selected !== idx && numbers[selected] === numbers[idx]) {
-                // Merge
-                numbers[selected] *= 2;
-                mergedNumbers.push(numbers[selected]);
-                numbers.splice(idx, 1);
-                if (idx < selected) selected--;
-                selected = null;
-            } else if (selected !== idx) {
-                // Show overlay for invalid merge
-                showOverlay("Nope that's not right dummy");
-                selected = idx;
-            } else {
-                selected = idx;
-            }
-            render();
+        function showAreYouSureOverlay(onYes, onNo) {
+            const overlay = document.getElementById('overlay');
+            overlay.innerHTML = '';
+            const msg = document.createElement('div');
+            msg.textContent = 'Are you sure you wanna do that?';
+            overlay.appendChild(msg);
+            const btnRow = document.createElement('div');
+            btnRow.style.marginTop = '32px';
+            btnRow.style.display = 'flex';
+            btnRow.style.gap = '24px';
+            const yesBtn = document.createElement('button');
+            yesBtn.textContent = 'Yes';
+            yesBtn.style.fontSize = '1em';
+            yesBtn.style.padding = '10px 32px';
+            yesBtn.style.borderRadius = '8px';
+            yesBtn.style.border = 'none';
+            yesBtn.style.background = 'linear-gradient(90deg, #4f8cff, #6ee7ff)';
+            yesBtn.style.color = '#fff';
+            yesBtn.style.fontWeight = 'bold';
+            yesBtn.style.cursor = 'pointer';
+            yesBtn.style.boxShadow = '0 2px 8px rgba(79,140,255,0.15)';
+            yesBtn.onclick = () => {
+                overlay.style.display = 'none';
+                onYes();
+            };
+            const noBtn = document.createElement('button');
+            noBtn.textContent = 'No';
+            noBtn.style.fontSize = '1em';
+            noBtn.style.padding = '10px 32px';
+            noBtn.style.borderRadius = '8px';
+            noBtn.style.border = 'none';
+            noBtn.style.background = 'linear-gradient(90deg, #ff4f4f, #ffb36e)';
+            noBtn.style.color = '#fff';
+            noBtn.style.fontWeight = 'bold';
+            noBtn.style.cursor = 'pointer';
+            noBtn.style.boxShadow = '0 2px 8px rgba(255,79,79,0.15)';
+            noBtn.onclick = () => {
+                overlay.style.display = 'none';
+                if (onNo) onNo();
+            };
+            btnRow.appendChild(yesBtn);
+            btnRow.appendChild(noBtn);
+            overlay.appendChild(btnRow);
+            overlay.style.display = 'flex';
         }
 
-        // Add button to get more numbers
-        const moreBtn = document.createElement('button');
-        moreBtn.textContent = 'Get More Numbers';
-        moreBtn.onclick = () => {
-            // Add 10 of the highest unlocked number
-            let unlockedArr = Array.from(unlockedNumbers).map(Number).sort((a,b)=>a-b);
-            let highestUnlocked = unlockedArr[unlockedArr.length-1] || 2;
-            for (let i = 0; i < 10; i++) {
-                numbers.push(highestUnlocked);
-            }
-            showOverlay('Wow you got more nubmers');
-            render();
-        };
-        document.addEventListener('DOMContentLoaded', () => {
-            document.body.insertBefore(moreBtn, document.getElementById('grid'));
-        // Add "Merge All" button
-        const mergeAllBtn = document.createElement('button');
-        mergeAllBtn.textContent = 'Merge All';
-        mergeAllBtn.onclick = () => {
-            showOverlay('Cheater cheater pumpkin eater');
-            // Reset progress
-            numbers = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
-            mergedNumbers = [];
-            unlockedNumbers = new Set([2]);
-            hasWon = false;
-            render();
-        };
-        document.body.insertBefore(mergeAllBtn, moreBtn.nextSibling);
+        // Add cooldown timer element to the DOM
+        let cooldownTimerDiv = document.createElement('div');
+        cooldownTimerDiv.id = 'cooldown-timer';
+        cooldownTimerDiv.style.position = 'fixed';
+        cooldownTimerDiv.style.left = '0';
+        cooldownTimerDiv.style.right = '0';
+        cooldownTimerDiv.style.bottom = '24px';
+        cooldownTimerDiv.style.margin = '0 auto';
+        cooldownTimerDiv.style.width = 'fit-content';
+        cooldownTimerDiv.style.padding = '12px 32px';
+        cooldownTimerDiv.style.background = 'rgba(30,40,60,0.85)';
+        cooldownTimerDiv.style.color = '#fff';
+        cooldownTimerDiv.style.fontSize = '1.5em';
+        cooldownTimerDiv.style.fontWeight = 'bold';
+        cooldownTimerDiv.style.borderRadius = '16px';
+        cooldownTimerDiv.style.boxShadow = '0 2px 16px 0 rgba(79,140,255,0.18)';
+        cooldownTimerDiv.style.textAlign = 'center';
+        cooldownTimerDiv.style.zIndex = '2000';
+        cooldownTimerDiv.style.display = 'none';
+        document.body.appendChild(cooldownTimerDiv);
 
+        function startCooldownTimer(durationMs) {
+            let end = Date.now() + durationMs;
+            cooldownTimerDiv.style.display = 'block';
+            function update() {
+                let left = Math.max(0, end - Date.now());
+                let sec = (left / 1000).toFixed(1);
+                cooldownTimerDiv.textContent = `Cooldown: ${sec}s`;
+                if (left > 0 && mergeCooldown) {
+                    requestAnimationFrame(update);
+                } else {
+                    cooldownTimerDiv.style.display = 'none';
+                }
+            }
+            update();
+        }
+
+        function playMergeAudio() {
+            if (!mergeAudio) {
+                // A short, fun synth beep using Web Audio API
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'triangle';
+                o.frequency.value = 540 + Math.random() * 120; // randomize a bit
+                g.gain.value = 0.18;
+                o.connect(g).connect(ctx.destination);
+                o.start();
+                g.gain.linearRampToValueAtTime(0.18, ctx.currentTime + 0.01);
+                g.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.22);
+                o.stop(ctx.currentTime + 0.22);
+                o.onended = () => ctx.close();
+                mergeAudio = true; // just to avoid re-creating var, not the context
+            } else {
+                // Always create a new context for each sound
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'triangle';
+                o.frequency.value = 540 + Math.random() * 120;
+                g.gain.value = 0.18;
+                o.connect(g).connect(ctx.destination);
+                o.start();
+                g.gain.linearRampToValueAtTime(0.18, ctx.currentTime + 0.01);
+                g.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.22);
+                o.stop(ctx.currentTime + 0.22);
+                o.onended = () => ctx.close();
+            }
+        }
+
+        function playMergeBeep() {
+            const audio = document.getElementById('merge-audio');
+            if (audio) {
+                audio.currentTime = 0;
+                audio.play();
+            }
+        }
+
+        function selectCell(idx) {
+            if (isScattered || mergeCooldown) return;
+            if (selected === null) {
+                if (!isPotato(numbers[idx])) selected = idx;
+            } else if (
+                selected !== idx &&
+                !isPotato(numbers[selected]) &&
+                !isPotato(numbers[idx]) &&
+                numbers[selected] === numbers[idx]
+            ) {
+                // Ask for confirmation before merging
+                pendingMerge = { idx1: selected, idx2: idx };
+                showAreYouSureOverlay(() => {
+                    // Merge after confirmation
+                    if (pendingMerge) {
+                        const { idx1, idx2 } = pendingMerge;
+                        // Double-check indices are still valid and numbers match and not potatoes
+                        if (
+                            idx1 !== null && idx2 !== null &&
+                            idx1 !== idx2 &&
+                            !isPotato(numbers[idx1]) &&
+                            !isPotato(numbers[idx2]) &&
+                            numbers[idx1] === numbers[idx2]
+                        ) {
+                            if (
+                                numbers[idx1] === 64 && numbers[idx2] === 64 && Math.random() < 0.4
+                            ) {
+                                numbers[idx1] = 8;
+                                showOverlay('Obviously 64 + 64 = 8!', 3000);
+                                playMergeBeep();
+                            } else if (Math.random() < 0.25) {
+                                numbers[idx1] = '🥔';
+                                showOverlay('You merged into a potato!', 5000);
+                                playMergeBeep(); // Play audio for potato merge too
+                            } else {
+                                numbers[idx1] *= 2;
+                                mergedNumbers.push(numbers[idx1]);
+                                showOverlay('Numbers merged!');
+                                playMergeBeep(); // Play beep on successful merge
+                                mergeCount++;
+                                if (mergeCount % 2 === 0) {
+                                    document.getElementById('powerup-btn').style.display = '';
+                                }
+                            }
+                            numbers.splice(idx2, 1);
+                            selected = null;
+                            pendingMerge = null;
+                            render();
+                            checkUnlock(numbers[idx1]);
+                            mergeCooldown = true;
+                            startCooldownTimer(10000);
+                            setTimeout(() => {
+                                mergeCooldown = false;
+                                cooldownTimerDiv.style.display = 'none';
+                            }, 10000);
+                        }
+                    }
+                });
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('more-btn').onclick = () => {
+                // Add 10 of the highest unlocked number
+                let unlockedArr = Array.from(unlockedNumbers).map(Number).sort((a,b)=>a-b);
+                let highestUnlocked = unlockedArr[unlockedArr.length-1] || 2;
+                for (let i = 0; i < 10; i++) {
+                    numbers.push(highestUnlocked);
+                }
+                showOverlay('Wow you got more nubmers');
+                render();
+            };
+            document.getElementById('merge-all-btn').onclick = () => {
+                showOverlay('Cheater cheater pumpkin eater');
+                // Reset progress
+                numbers = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
+                mergedNumbers = [];
+                unlockedNumbers = new Set([2]);
+                hasWon = false;
+                render();
+            };
+            document.getElementById('powerup-btn').onclick = () => {
+                // Find all non-potato indices
+                let nonPotatoIndices = numbers
+                    .map((n, i) => (!isPotato(n) ? i : null))
+                    .filter(i => i !== null);
+                // Shuffle and pick 5
+                for (let i = nonPotatoIndices.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [nonPotatoIndices[i], nonPotatoIndices[j]] = [nonPotatoIndices[j], nonPotatoIndices[i]];
+                }
+                let toPotato = nonPotatoIndices.slice(0, 5);
+                toPotato.forEach(i => numbers[i] = '🥔');
+                render();
+                showOverlay('I hope you like potatoes', 3000);
+                document.getElementById('powerup-btn').style.display = 'none';
+            };
         });
-        render();
     </script>
 </body>
 </html>
